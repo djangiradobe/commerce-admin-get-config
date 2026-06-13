@@ -1,0 +1,47 @@
+{
+  "name": "configuration-get-config",
+  "version": "0.1.2",
+  "description": "Read scoped system configuration from Adobe App Builder Database (ABDB) with Magento-style inheritance, encryption, and Commerce REST scope resolution.",
+  "license": "Apache-2.0",
+  "author": "Adobe Inc.",
+  "keywords": [
+    "adobe-io",
+    "aio",
+    "app-builder",
+    "adobe-commerce",
+    "configuration",
+    "abdb",
+    "get-config"
+  ],
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./abdb": "./src/abdb-helper.js",
+    "./config": "./src/abdb-config.js",
+    "./crypto": "./src/system-config-crypto.js",
+    "./shared": "./src/system-config-shared.js",
+    "./oauth1a": "./src/oauth1a.js"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@adobe/aio-lib-core-auth": "^1.1.0",
+    "@adobe/aio-lib-db": "^1.0.1",
+    "@adobe/aio-lib-ims": "^8.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "dependencies": {
+    "got": "^11.8.5",
+    "oauth-1.0a": "^2.2.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/djangiradobe/configuration-get-config.git",
+    "directory": "packages/configuration-get-config"
+  }
+}
