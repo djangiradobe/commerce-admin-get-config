@@ -1,4 +1,4 @@
-# configuration-get-config
+# @adobedjangir/commerce-admin-get-config
 
 Read scoped system configuration from **Adobe App Builder Database (ABDB)**.
 
@@ -7,7 +7,7 @@ Provides `getConfig()` with Magento-style scope inheritance (`default` → `webs
 ## Install
 
 ```bash
-npm install configuration-get-config
+npm install @adobedjangir/commerce-admin-get-config
 ```
 
 Peer dependencies (App Builder runtime):
@@ -19,7 +19,7 @@ npm install @adobe/aio-lib-core-auth @adobe/aio-lib-db @adobe/aio-lib-ims dotenv
 ## Usage
 
 ```js
-const { getConfig } = require('configuration-get-config')
+const { getConfig } = require('@adobedjangir/commerce-admin-get-config')
 
 async function main (params) {
   const apiUrl = await getConfig('sync_general/api/url', params, {
