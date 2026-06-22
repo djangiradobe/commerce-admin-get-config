@@ -28,7 +28,45 @@ function normalizeScopesToArray (scopes) {
   if (Array.isArray(scopes)) return scopes.filter(Boolean).map(String)
   const s = String(scopes).trim()
   if (!s) return []
+  // Newer Adobe Developer Console templates ship scopes as a JSON array
+  // literal (e.g. ["AdobeID","openid",…]). Detect + parse rather than
+  // splitting on commas — which would otherwise produce strings like
+  // '["AdobeID"' and '"openid"' with stray brackets and quotes.
+  if (s.startsWith('[')) {
+    try {
+      const arr = JSON.parse(s)
+      if (Array.isArray(arr)) return arr.filter(Boolean).map(String)
+    } catch (_) { /* fall through to delimiter split */ }
+  }
   return s.split(/[\s,]+/).filter(Boolean)
+}
+
+/**
+ * Read an OAuth Server-to-Server credential value from params, preferring
+ * the legacy OAUTH_* prefix and falling back to the newer IMS_OAUTH_S2S_*
+ * prefix that current Adobe Developer Console templates ship with. Both
+ * point at the same credential; this normalises the lookup so action code
+ * can stay prefix-agnostic.
+ *
+ * Walks (params.OAUTH_*, params.IMS_OAUTH_S2S_*, env.OAUTH_*, env.IMS_OAUTH_S2S_*)
+ * and returns the first value that's set AND not an unresolved `$VAR`
+ * placeholder. This matters when aio injects `OAUTH_CLIENT_ID: $OAUTH_CLIENT_ID`
+ * but the host's .env only has `IMS_OAUTH_S2S_CLIENT_ID=…`: the legacy
+ * param is the literal `$OAUTH_CLIENT_ID` string, and we must skip past it.
+ */
+function pickOauthParam (params, baseName) {
+  const legacy = `OAUTH_${baseName}`
+  const newer  = `IMS_OAUTH_S2S_${baseName}`
+  const candidates = [
+    params[legacy],
+    params[newer],
+    process.env[legacy],
+    process.env[newer]
+  ]
+  for (const v of candidates) {
+    if (v && !isUnsetOauthInput(v)) return v
+  }
+  return ''
 }
 
 /**
@@ -161,13 +199,17 @@ async function ensureImportCollectionsExist (client, options = {}) {
  * @returns {Promise<string|null>} token or null if required params are missing
  */
 async function fetchImsTokenFromClientCredentials (params = {}) {
-  const clientId = params.OAUTH_CLIENT_ID
-  const clientSecret = params.OAUTH_CLIENT_SECRET
-  const orgId = params.OAUTH_ORG_ID
+  // Accept either legacy OAUTH_* or newer IMS_OAUTH_S2S_* prefixes —
+  // whichever the host's .env / workspace template uses.
+  const clientId     = pickOauthParam(params, 'CLIENT_ID')
+  const clientSecret = pickOauthParam(params, 'CLIENT_SECRET')
+  const orgId        = pickOauthParam(params, 'ORG_ID')
   if (isUnsetOauthInput(clientId) || isUnsetOauthInput(clientSecret) || isUnsetOauthInput(orgId)) {
     return null
   }
-  const extra = normalizeScopesToArray(params.OAUTH_SCOPES)
+  const extra = normalizeScopesToArray(
+    pickOauthParam(params, 'SCOPES') || params.OAUTH_SCOPES || params.IMS_OAUTH_S2S_SCOPES
+  )
   const scopes = [...new Set([...ABDB_SCOPES, ...extra])]
   if (scopes.length === 0) {
     throw new Error('No IMS scopes resolved for ABDB; set OAUTH_SCOPES or rely on default ABDB scopes')
