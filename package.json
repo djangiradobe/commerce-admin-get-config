@@ -1,6 +1,6 @@
 {
   "name": "@adobedjangir/commerce-admin-get-config",
-  "version": "0.0.2",
+  "version": "0.0.5",
   "description": "Read scoped system configuration from Adobe App Builder Database (ABDB) with Magento-style inheritance, encryption, and Commerce REST scope resolution.",
   "license": "Apache-2.0",
   "author": "Adobe Inc.",
@@ -29,15 +29,20 @@
   "engines": {
     "node": ">=18"
   },
-  "peerDependencies": {
+  "dependencies": {
     "@adobe/aio-lib-core-auth": "^1.1.0",
     "@adobe/aio-lib-db": "^1.0.1",
     "@adobe/aio-lib-ims": "^8.0.0",
-    "dotenv": "^16.4.5"
-  },
-  "dependencies": {
     "got": "^11.8.5",
     "oauth-1.0a": "^2.2.6"
+  },
+  "peerDependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "peerDependenciesMeta": {
+    "dotenv": {
+      "optional": true
+    }
   },
   "repository": {
     "type": "git",

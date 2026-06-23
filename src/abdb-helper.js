@@ -70,7 +70,18 @@ function pickOauthParam (params, baseName) {
 }
 
 /**
- * Get ABDB client. Requires action to have include-ims-credentials: true.
+ * Get ABDB client.
+ *
+ * Token resolution:
+ *   1. options.token                                — explicit override
+ *   2. fetchImsTokenFromClientCredentials(params)   - uses OAUTH_ or IMS_OAUTH_S2S_ env
+ *   3. @adobe/aio-lib-core-auth.generateAccessToken — fallback when
+ *      include-ims-credentials annotation is set
+ *
+ * The action manifest no longer needs include-ims-credentials: true —
+ * dropping that annotation avoids the iron-session "Unsupported state"
+ * middleware error on workspaces where the runtime's IMS state cookie
+ * can't be unsealed.
  *
  * Region resolution (first non-empty wins):
  *   1. options.region              — explicit override at the call site
@@ -79,14 +90,31 @@ function pickOauthParam (params, baseName) {
  *
  * Throws if none is configured — we never silently pick a region for you.
  *
- * @param {object} params - Action params (must contain OAuth credentials for generateAccessToken)
- * @param {object} [options]
- * @param {string} [options.region] - explicit region override
+ * @param {object} params - Action params (OAuth credentials via env)
+ * @param {object} [options] { token?, region? }
  * @returns {Promise<{client: object, close: function}>}
  */
 async function getClient (params, options = {}) {
-  const tokenResponse = await generateAccessToken(params)
-  const token = tokenResponse.access_token || tokenResponse
+  let token = options && options.token ? String(options.token) : null
+  if (!token) {
+    // Prefer our own IMS client-credentials exchange. It reads OAUTH_* and
+    // IMS_OAUTH_S2S_* from params + env, so it works regardless of which
+    // prefix the workspace's .env uses and without needing the
+    // include-ims-credentials annotation.
+    token = await fetchImsTokenFromClientCredentials(params)
+  }
+  if (!token) {
+    // Last resort — the legacy path. Will throw the AuthSDK error if
+    // include-ims-credentials isn't set AND OAUTH_* aren't camelCased.
+    const tokenResponse = await generateAccessToken(params)
+    token = tokenResponse?.access_token?.token || tokenResponse?.access_token || tokenResponse
+  }
+  if (!token) {
+    throw new Error(
+      'Could not obtain IMS token. Ensure OAUTH_CLIENT_ID / OAUTH_CLIENT_SECRET / OAUTH_ORG_ID / OAUTH_SCOPES ' +
+      '(or IMS_OAUTH_S2S_* equivalents) are set in .env.'
+    )
+  }
   const region = options.region || params?.AIO_DB_REGION || process.env.AIO_DB_REGION
   if (!region || typeof region !== 'string' || !region.trim()) {
     throw new Error(
