@@ -509,6 +509,7 @@ module.exports = {
   getCollection,
   ensureImportCollectionsExist,
   resolveImsToken,
+  fetchImsTokenFromClientCredentials,
   getCollectionByName,
   getClientAbdb,
   withDbClient,
