@@ -28,60 +28,11 @@ function normalizeScopesToArray (scopes) {
   if (Array.isArray(scopes)) return scopes.filter(Boolean).map(String)
   const s = String(scopes).trim()
   if (!s) return []
-  // Newer Adobe Developer Console templates ship scopes as a JSON array
-  // literal (e.g. ["AdobeID","openid",…]). Detect + parse rather than
-  // splitting on commas — which would otherwise produce strings like
-  // '["AdobeID"' and '"openid"' with stray brackets and quotes.
-  if (s.startsWith('[')) {
-    try {
-      const arr = JSON.parse(s)
-      if (Array.isArray(arr)) return arr.filter(Boolean).map(String)
-    } catch (_) { /* fall through to delimiter split */ }
-  }
   return s.split(/[\s,]+/).filter(Boolean)
 }
 
 /**
- * Read an OAuth Server-to-Server credential value from params, preferring
- * the legacy OAUTH_* prefix and falling back to the newer IMS_OAUTH_S2S_*
- * prefix that current Adobe Developer Console templates ship with. Both
- * point at the same credential; this normalises the lookup so action code
- * can stay prefix-agnostic.
- *
- * Walks (params.OAUTH_*, params.IMS_OAUTH_S2S_*, env.OAUTH_*, env.IMS_OAUTH_S2S_*)
- * and returns the first value that's set AND not an unresolved `$VAR`
- * placeholder. This matters when aio injects `OAUTH_CLIENT_ID: $OAUTH_CLIENT_ID`
- * but the host's .env only has `IMS_OAUTH_S2S_CLIENT_ID=…`: the legacy
- * param is the literal `$OAUTH_CLIENT_ID` string, and we must skip past it.
- */
-function pickOauthParam (params, baseName) {
-  const legacy = `OAUTH_${baseName}`
-  const newer  = `IMS_OAUTH_S2S_${baseName}`
-  const candidates = [
-    params[legacy],
-    params[newer],
-    process.env[legacy],
-    process.env[newer]
-  ]
-  for (const v of candidates) {
-    if (v && !isUnsetOauthInput(v)) return v
-  }
-  return ''
-}
-
-/**
- * Get ABDB client.
- *
- * Token resolution:
- *   1. options.token                                — explicit override
- *   2. fetchImsTokenFromClientCredentials(params)   - uses OAUTH_ or IMS_OAUTH_S2S_ env
- *   3. @adobe/aio-lib-core-auth.generateAccessToken — fallback when
- *      include-ims-credentials annotation is set
- *
- * The action manifest no longer needs include-ims-credentials: true —
- * dropping that annotation avoids the iron-session "Unsupported state"
- * middleware error on workspaces where the runtime's IMS state cookie
- * can't be unsealed.
+ * Get ABDB client. Requires action to have include-ims-credentials: true.
  *
  * Region resolution (first non-empty wins):
  *   1. options.region              — explicit override at the call site
@@ -90,31 +41,14 @@ function pickOauthParam (params, baseName) {
  *
  * Throws if none is configured — we never silently pick a region for you.
  *
- * @param {object} params - Action params (OAuth credentials via env)
- * @param {object} [options] { token?, region? }
+ * @param {object} params - Action params (must contain OAuth credentials for generateAccessToken)
+ * @param {object} [options]
+ * @param {string} [options.region] - explicit region override
  * @returns {Promise<{client: object, close: function}>}
  */
 async function getClient (params, options = {}) {
-  let token = options && options.token ? String(options.token) : null
-  if (!token) {
-    // Prefer our own IMS client-credentials exchange. It reads OAUTH_* and
-    // IMS_OAUTH_S2S_* from params + env, so it works regardless of which
-    // prefix the workspace's .env uses and without needing the
-    // include-ims-credentials annotation.
-    token = await fetchImsTokenFromClientCredentials(params)
-  }
-  if (!token) {
-    // Last resort — the legacy path. Will throw the AuthSDK error if
-    // include-ims-credentials isn't set AND OAUTH_* aren't camelCased.
-    const tokenResponse = await generateAccessToken(params)
-    token = tokenResponse?.access_token?.token || tokenResponse?.access_token || tokenResponse
-  }
-  if (!token) {
-    throw new Error(
-      'Could not obtain IMS token. Ensure OAUTH_CLIENT_ID / OAUTH_CLIENT_SECRET / OAUTH_ORG_ID / OAUTH_SCOPES ' +
-      '(or IMS_OAUTH_S2S_* equivalents) are set in .env.'
-    )
-  }
+  const tokenResponse = await generateAccessToken(params)
+  const token = tokenResponse.access_token || tokenResponse
   const region = options.region || params?.AIO_DB_REGION || process.env.AIO_DB_REGION
   if (!region || typeof region !== 'string' || !region.trim()) {
     throw new Error(
@@ -227,17 +161,13 @@ async function ensureImportCollectionsExist (client, options = {}) {
  * @returns {Promise<string|null>} token or null if required params are missing
  */
 async function fetchImsTokenFromClientCredentials (params = {}) {
-  // Accept either legacy OAUTH_* or newer IMS_OAUTH_S2S_* prefixes —
-  // whichever the host's .env / workspace template uses.
-  const clientId     = pickOauthParam(params, 'CLIENT_ID')
-  const clientSecret = pickOauthParam(params, 'CLIENT_SECRET')
-  const orgId        = pickOauthParam(params, 'ORG_ID')
+  const clientId = params.OAUTH_CLIENT_ID
+  const clientSecret = params.OAUTH_CLIENT_SECRET
+  const orgId = params.OAUTH_ORG_ID
   if (isUnsetOauthInput(clientId) || isUnsetOauthInput(clientSecret) || isUnsetOauthInput(orgId)) {
     return null
   }
-  const extra = normalizeScopesToArray(
-    pickOauthParam(params, 'SCOPES') || params.OAUTH_SCOPES || params.IMS_OAUTH_S2S_SCOPES
-  )
+  const extra = normalizeScopesToArray(params.OAUTH_SCOPES)
   const scopes = [...new Set([...ABDB_SCOPES, ...extra])]
   if (scopes.length === 0) {
     throw new Error('No IMS scopes resolved for ABDB; set OAUTH_SCOPES or rely on default ABDB scopes')
@@ -509,7 +439,6 @@ module.exports = {
   getCollection,
   ensureImportCollectionsExist,
   resolveImsToken,
-  fetchImsTokenFromClientCredentials,
   getCollectionByName,
   getClientAbdb,
   withDbClient,
