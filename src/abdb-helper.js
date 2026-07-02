@@ -46,23 +46,56 @@ function normalizeScopesToArray (scopes) {
  * @param {string} [options.region] - explicit region override
  * @returns {Promise<{client: object, close: function}>}
  */
+// Connection reuse across WARM action invocations. Each action container that
+// bundles this helper keeps a single connected client and reuses it, instead
+// of minting an IMS token + init + connect on every request (pure latency on a
+// warm container). The connection is refreshed after CLIENT_TTL_MS (bounds
+// staleness / token age), and rebuilt on connect failure. The `close()` we
+// hand callers is a NO-OP so their `finally { close() }` doesn't tear down the
+// shared connection — the container's teardown reclaims it.
+let _cachedClient = null
+let _cachedRegion = null
+let _cachedAt = 0
+const CLIENT_TTL_MS = 10 * 60 * 1000
+const NOOP_CLOSE = async () => {}
+
 async function getClient (params, options = {}) {
-  const tokenResponse = await generateAccessToken(params)
-  const token = tokenResponse.access_token || tokenResponse
-  const region = options.region || params?.AIO_DB_REGION || process.env.AIO_DB_REGION
-  if (!region || typeof region !== 'string' || !region.trim()) {
+  const region = (options.region || params?.AIO_DB_REGION || process.env.AIO_DB_REGION || '').trim()
+  if (!region) {
     throw new Error(
       'ABDB region not configured: set AIO_DB_REGION in .env and pass it through ext.config.yaml inputs'
     )
   }
 
-  const db = await libDb.init({ token, region: region.trim() })
+  const now = Date.now()
+  if (_cachedClient && _cachedRegion === region && (now - _cachedAt) < CLIENT_TTL_MS) {
+    return { client: _cachedClient, close: NOOP_CLOSE }
+  }
+
+  // Refresh: drop a stale/expired connection before opening a new one so we
+  // don't leak the old socket.
+  if (_cachedClient) {
+    try { await _cachedClient.close() } catch (_) { /* ignore */ }
+    _cachedClient = null
+  }
+
+  const tokenResponse = await generateAccessToken(params)
+  const token = tokenResponse.access_token || tokenResponse
+  const db = await libDb.init({ token, region })
   const client = await db.connect()
 
-  return {
-    client,
-    close: () => client.close()
-  }
+  _cachedClient = client
+  _cachedRegion = region
+  _cachedAt = now
+  return { client, close: NOOP_CLOSE }
+}
+
+/** Force the next getClient() to reconnect — call after a connection error. */
+function resetClientCache () {
+  if (_cachedClient) { try { _cachedClient.close() } catch (_) {} }
+  _cachedClient = null
+  _cachedRegion = null
+  _cachedAt = 0
 }
 
 /**
@@ -436,6 +469,7 @@ module.exports = {
   COLLECTION_IMPORT_QUEUE,
   IMPORT_PIPELINE_COLLECTIONS,
   getClient,
+  resetClientCache,
   getCollection,
   ensureImportCollectionsExist,
   resolveImsToken,
