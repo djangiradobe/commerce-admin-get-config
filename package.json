@@ -1,6 +1,6 @@
 {
   "name": "@adobedjangir/commerce-admin-get-config",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Read scoped system configuration from Adobe App Builder Database (ABDB) with Magento-style inheritance, encryption, and Commerce REST scope resolution.",
   "license": "Apache-2.0",
   "author": "Adobe Inc.",
@@ -14,6 +14,7 @@
     "get-config"
   ],
   "main": "./src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": "./src/index.js",
     "./abdb": "./src/abdb-helper.js",
@@ -27,7 +28,8 @@
     "README.md",
     "!**/*.ts",
     "!**/*.tsx",
-    "!tsconfig.json"
+    "!tsconfig.json",
+    "**/*.d.ts"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

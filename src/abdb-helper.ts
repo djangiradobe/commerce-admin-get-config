@@ -465,7 +465,7 @@ async function renameCollection (client, collectionName, newCollectionName, opti
   return col
 }
 
-module.exports = {
+export {
   COLLECTION_IMPORT_QUEUE,
   IMPORT_PIPELINE_COLLECTIONS,
   getClient,

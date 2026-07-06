@@ -76,7 +76,7 @@ function buildInheritanceChain (scope, scopeId, parentWebsiteId) {
   return chain
 }
 
-module.exports = {
+export {
   STATE_KEY_PREFIX,
   SCOPES,
   SENSITIVE_PLACEHOLDER,

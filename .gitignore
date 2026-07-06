@@ -7,3 +7,6 @@
 /scripts/**/*.js
 /web/dist/
 node_modules/
+/src/**/*.d.ts
+/actions/**/*.d.ts
+/scripts/**/*.d.ts

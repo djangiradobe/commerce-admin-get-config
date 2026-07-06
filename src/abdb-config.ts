@@ -234,7 +234,7 @@ function clearAbdbConfigCache () {
   storeCodeToId = null
 }
 
-module.exports = {
+export {
   COLLECTION,
   getConfig,
   clearAbdbConfigCache

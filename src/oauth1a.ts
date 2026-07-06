@@ -129,7 +129,7 @@ function getCommerceOauthClient(options, logger) {
   return getOauthClient(options, logger)
 }
 
-module.exports = {
+export {
   getOauthClient,
   getCommerceOauthClient
 }

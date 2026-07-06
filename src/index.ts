@@ -5,16 +5,12 @@ you may not use this file except in compliance with the License. You may obtain 
 of the License at http://www.apache.org/licenses/LICENSE-2.0
 */
 
-const abdbHelper = require('./abdb-helper')
-const abdbConfig = require('./abdb-config')
-const systemConfigShared = require('./system-config-shared')
-const systemConfigCrypto = require('./system-config-crypto')
-const oauth1a = require('./oauth1a')
-
-module.exports = {
-  ...abdbHelper,
-  ...abdbConfig,
-  ...systemConfigShared,
-  ...systemConfigCrypto,
-  ...oauth1a
-}
+// Barrel: re-export every helper. ESM `export *` compiles (module: commonjs) to
+// the same aggregated CommonJS surface the previous `module.exports = { ...a }`
+// produced, and lets tsc emit useful .d.ts. The source modules have no
+// overlapping export names, so no ambiguity is dropped.
+export * from './abdb-helper'
+export * from './abdb-config'
+export * from './system-config-shared'
+export * from './system-config-crypto'
+export * from './oauth1a'

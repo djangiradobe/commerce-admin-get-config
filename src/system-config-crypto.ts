@@ -104,7 +104,7 @@ function decrypt (encrypted, params) {
   return pt.toString('utf8')
 }
 
-module.exports = {
+export {
   ENC_PREFIX,
   isEncrypted,
   encrypt,
